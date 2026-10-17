@@ -4,55 +4,21 @@ package e2e
 
 import (
 	"context"
-	"log/slog"
-	"os"
 	"testing"
 
+	"github.com/syncgo/syncgo/e2e/pkg/utils"
 	"github.com/syncgo/syncgo/internal/bulk_transformer"
-	"github.com/syncgo/syncgo/pkg/config"
-	"github.com/syncgo/syncgo/pkg/search_engine_client"
-	"github.com/syncgo/syncgo/pkg/search_engine_client/mocks"
+	"github.com/syncgo/syncgo/pkg/metrics"
 
 	"github.com/google/uuid"
-	gomock "go.uber.org/mock/gomock"
 )
-
-func newOpensearchClient(t *testing.T, ctrl *gomock.Controller, monitoring *mocks.MockMonitoring) *search_engine_client.Client {
-	t.Helper()
-
-	cfg, err := config.LoadFromYAML("config_opensearch.yaml")
-	if err != nil {
-		slog.Error("failed to load config", slog.String("err", err.Error()))
-		os.Exit(1)
-	}
-
-	client, err := search_engine_client.New(context.Background(), search_engine_client.Config{
-		Name:              cfg.SearchEngine.Name,
-		Address:           cfg.SearchEngine.Address,
-		Username:          cfg.SearchEngine.Username,
-		Password:          cfg.SearchEngine.Password,
-		Index:             cfg.SearchEngine.Index,
-		ConnectionTimeout: cfg.SearchEngine.ConnectionTimeout,
-		GzipCompression:   cfg.SearchEngine.GzipCompression,
-	}, monitoring)
-	if err != nil {
-		t.Fatal("e2e; opensearch; failed to init opensearch client; error: ", err)
-	}
-
-	return client
-}
 
 func TestOpensearchClient_Create(t *testing.T) {
 	ctx := context.Background()
 
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	monitoring := metrics.DefaultMetrics
 
-	monitoring := mocks.NewMockMonitoring(ctrl)
-	monitoring.EXPECT().IncSearchRequests(gomock.Any(), gomock.Any()).MinTimes(1)
-	monitoring.EXPECT().AddSearchErrors(gomock.Any(), gomock.Any()).MaxTimes(1)
-
-	client := newOpensearchClient(t, ctrl, monitoring)
+	client := utils.NewSearchEngineClient(t, monitoring, "config_opensearch.yaml", "opensearch")
 
 	test_uuid := uuid.New().String()
 
@@ -72,14 +38,9 @@ func TestOpensearchClient_Create(t *testing.T) {
 func TestOpensearchClient_Delete(t *testing.T) {
 	ctx := context.Background()
 
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	monitoring := metrics.DefaultMetrics
 
-	monitoring := mocks.NewMockMonitoring(ctrl)
-	monitoring.EXPECT().IncSearchRequests(gomock.Any(), gomock.Any()).MinTimes(1)
-	monitoring.EXPECT().AddSearchErrors(gomock.Any(), gomock.Any()).MaxTimes(1)
-
-	client := newOpensearchClient(t, ctrl, monitoring)
+	client := utils.NewSearchEngineClient(t, monitoring, "config_opensearch.yaml", "opensearch")
 
 	test_uuid := uuid.New().String()
 
@@ -110,14 +71,9 @@ func TestOpensearchClient_Delete(t *testing.T) {
 func TestOpensearchClient_Index(t *testing.T) {
 	ctx := context.Background()
 
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	monitoring := metrics.DefaultMetrics
 
-	monitoring := mocks.NewMockMonitoring(ctrl)
-	monitoring.EXPECT().IncSearchRequests(gomock.Any(), gomock.Any()).MinTimes(1)
-	monitoring.EXPECT().AddSearchErrors(gomock.Any(), gomock.Any()).MaxTimes(1)
-
-	client := newOpensearchClient(t, ctrl, monitoring)
+	client := utils.NewSearchEngineClient(t, monitoring, "config_opensearch.yaml", "opensearch")
 
 	test_uuid := uuid.New().String()
 
@@ -149,14 +105,9 @@ func TestOpensearchClient_Index(t *testing.T) {
 func TestOpensearchClient_Update(t *testing.T) {
 	ctx := context.Background()
 
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	monitoring := metrics.DefaultMetrics
 
-	monitoring := mocks.NewMockMonitoring(ctrl)
-	monitoring.EXPECT().IncSearchRequests(gomock.Any(), gomock.Any()).MinTimes(1)
-	monitoring.EXPECT().AddSearchErrors(gomock.Any(), gomock.Any()).MaxTimes(1)
-
-	client := newOpensearchClient(t, ctrl, monitoring)
+	client := utils.NewSearchEngineClient(t, monitoring, "config_opensearch.yaml", "opensearch")
 
 	test_uuid := uuid.New().String()
 
@@ -188,12 +139,9 @@ func TestOpensearchClient_Update(t *testing.T) {
 func TestOpensearchClient_CreateIndex(t *testing.T) {
 	ctx := context.Background()
 
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	monitoring := metrics.DefaultMetrics
 
-	monitoring := mocks.NewMockMonitoring(ctrl)
-
-	client := newOpensearchClient(t, ctrl, monitoring)
+	client := utils.NewSearchEngineClient(t, monitoring, "config_opensearch.yaml", "opensearch")
 
 	indexName := "test_" + uuid.New().String()
 
@@ -205,12 +153,9 @@ func TestOpensearchClient_CreateIndex(t *testing.T) {
 func TestOpensearchClient_IndexExists(t *testing.T) {
 	ctx := context.Background()
 
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	monitoring := metrics.DefaultMetrics
 
-	monitoring := mocks.NewMockMonitoring(ctrl)
-
-	client := newOpensearchClient(t, ctrl, monitoring)
+	client := utils.NewSearchEngineClient(t, monitoring, "config_opensearch.yaml", "opensearch")
 
 	indexName := "test_" + uuid.New().String()
 

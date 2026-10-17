@@ -17,7 +17,7 @@ const prepareTimeout = 30 * time.Second
 // Prepare creates the PostgreSQL publication and replication slot and the
 // search engine index. Every step is idempotent: existing objects are left
 // as is, so the command can be run multiple times safely.
-func Prepare(parentCtx context.Context, cfg *config.Config, monitoring *metrics.SearchMetrics) error {
+func Prepare(parentCtx context.Context, cfg *config.Config, monitoring *metrics.Metrics) error {
 	ctx, cancel := context.WithTimeout(parentCtx, prepareTimeout)
 	defer cancel()
 
@@ -69,7 +69,7 @@ func preparePublicationAndSlot(ctx context.Context, cfg *config.Config) error {
 }
 
 // prepareIndex ensures the search engine index exists.
-func prepareIndex(ctx context.Context, cfg *config.Config, monitoring *metrics.SearchMetrics) error {
+func prepareIndex(ctx context.Context, cfg *config.Config, monitoring *metrics.Metrics) error {
 	client, err := search_engine_client.New(ctx, search_engine_client.Config{
 		Name:              cfg.SearchEngine.Name,
 		Address:           cfg.SearchEngine.Address,

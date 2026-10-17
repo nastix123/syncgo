@@ -95,7 +95,7 @@ func runPrepare(args []string) {
 	ctx := context.Background()
 	cfg := loadConfig(args)
 
-	if err := processor.Prepare(ctx, cfg, metrics.New()); err != nil {
+	if err := processor.Prepare(ctx, cfg, metrics.DefaultMetrics); err != nil {
 		logger.Error("prepare failed", err)
 		os.Exit(1)
 	}
@@ -111,7 +111,7 @@ func runRun(args []string) {
 
 	cfg := loadConfig(args)
 
-	p, err := processor.New(ctx, cfg, metrics.New())
+	p, err := processor.New(ctx, cfg, metrics.DefaultMetrics)
 	if err != nil {
 		logger.Error("failed to initialize processor", err)
 		os.Exit(1)
