@@ -15,7 +15,7 @@ const syncOpensearchTable = "sync_opensearch_rows"
 func TestOpensearchSync_ReplicatesRowsFromPostgres(t *testing.T) {
 	ctx := context.Background()
 
-	cfg := utils.LoadConfig(t)
+	cfg := utils.LoadConfigFrom(t, "config_sync_opensearch.yaml")
 	pgCfg := utils.PgConfigFrom(cfg)
 
 	utils.SetupTable(t, ctx, pgCfg, syncOpensearchTable)

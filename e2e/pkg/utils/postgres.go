@@ -32,6 +32,15 @@ func LoadConfig(t *testing.T) *config.Config {
 		path = defaultConfigPath
 	}
 
+	return LoadConfigFrom(t, path)
+}
+
+// LoadConfigFrom loads the config from the given path, failing the test on
+// error. Each suite passes its own config so that its slot/publication/index
+// names do not clash with other suites running in the same CI job.
+func LoadConfigFrom(t *testing.T, path string) *config.Config {
+	t.Helper()
+
 	cfg, err := config.LoadFromYAML(path)
 	if err != nil {
 		t.Fatalf("e2e; failed to load config %q; error: %v", path, err)

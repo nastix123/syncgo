@@ -15,7 +15,7 @@ const syncElasticTable = "sync_elastic_rows"
 func TestElasticsearchSync_ReplicatesRowsFromPostgres(t *testing.T) {
 	ctx := context.Background()
 
-	cfg := utils.LoadConfig(t)
+	cfg := utils.LoadConfigFrom(t, "config_sync_elasticsearch.yaml")
 	pgCfg := utils.PgConfigFrom(cfg)
 
 	utils.SetupTable(t, ctx, pgCfg, syncElasticTable)
