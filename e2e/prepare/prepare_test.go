@@ -16,12 +16,9 @@ import (
 )
 
 const (
-	prepareTable     = "sync_prepare_rows"
-	prepareIndex     = "sync_prepare_index"
-	prepareTimeout   = 30 * time.Second
-	prepareSlotName  = "sync_prepare_slot"
-	preparePubName   = "sync_prepare_pub"
-	prepareSearchURL = "http://localhost:9200"
+	prepareTable   = "sync_prepare_rows"
+	prepareIndex   = "sync_prepare_index"
+	prepareTimeout = 30 * time.Second
 )
 
 // prepareConfig builds a config pointing prepare at the dedicated table,
@@ -34,13 +31,13 @@ func prepareConfig() *config.Config {
 			Host:            "localhost",
 			Port:            "5432",
 			Database:        "postgres",
-			PublicationName: preparePubName,
-			SlotName:        prepareSlotName,
+			PublicationName: "sync_prepare_pub",
+			SlotName:        "sync_prepare_slot",
 			Tables:          []string{"public." + prepareTable},
 		},
 		SearchEngine: config.SearchEngineConfig{
 			Name:    "elasticsearch",
-			Address: prepareSearchURL,
+			Address: "http://localhost:9200",
 			Index:   prepareIndex,
 		},
 	}
@@ -51,16 +48,10 @@ func TestPrepare_CreatesSlotPublicationAndIndex(t *testing.T) {
 	defer cancel()
 
 	cfg := prepareConfig()
-	pgCfg := postgresql.Config{
-		User:     cfg.PostgreSQL.User,
-		Password: cfg.PostgreSQL.Password,
-		Host:     cfg.PostgreSQL.Host,
-		Port:     cfg.PostgreSQL.Port,
-		Database: cfg.PostgreSQL.Database,
-	}
+	pgCfg := utils.PgConfigFrom(cfg)
 
 	// The table referenced by the publication must exist beforehand.
-	utils.SetupTable(t, ctx, pgCfg, prepareTable, cfg.PostgreSQL.PublicationName)
+	utils.SetupTable(t, ctx, pgCfg, prepareTable)
 
 	// First run creates the slot, publication and index.
 	if err := processor.Prepare(ctx, cfg, metrics.DefaultMetrics); err != nil {
@@ -99,8 +90,8 @@ func TestPrepare_CreatesSlotPublicationAndIndex(t *testing.T) {
 	}
 
 	// Cleanup.
-	utils.MustExec(t, ctx, conn, fmt.Sprintf("DROP PUBLICATION IF EXISTS %s", preparePubName))
-	_, _ = conn.Exec(ctx, "SELECT pg_drop_replication_slot('"+prepareSlotName+"')").ReadAll()
+	utils.MustExec(t, ctx, conn, fmt.Sprintf("DROP PUBLICATION IF EXISTS %s", cfg.PostgreSQL.PublicationName))
+	_, _ = conn.Exec(ctx, "SELECT pg_drop_replication_slot('"+cfg.PostgreSQL.SlotName+"')").ReadAll()
 }
 
 func indexExists(t *testing.T, address, index string) bool {
