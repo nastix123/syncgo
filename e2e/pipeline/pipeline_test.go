@@ -39,8 +39,6 @@ func TestPipeline_InsertSync(t *testing.T) {
 
 	utils.SetupTable(t, ctx, pgCfg, pipelineTable)
 
-	utils.RunProcessor(t, ctx, cfg)
-
 	run := time.Now().UnixNano()
 	names := make(map[int]string, rowCount)
 	for i := 1; i <= rowCount; i++ {
@@ -62,8 +60,6 @@ func TestPipeline_UpdateDelete(t *testing.T) {
 	pgCfg := utils.PgConfigFrom(cfg)
 
 	utils.SetupTable(t, ctx, pgCfg, pipelineTable)
-
-	utils.RunProcessor(t, ctx, cfg)
 
 	run := time.Now().UnixNano()
 	keepName := fmt.Sprintf("keep-%d", run)
