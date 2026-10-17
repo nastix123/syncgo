@@ -23,5 +23,5 @@ RUN mkdir /etc/syncgo
 COPY --from=builder /app/syncgo /usr/bin/syncgo
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
-ENTRYPOINT [ "/usr/bin/syncgo" ]
-CMD [""]
+ENTRYPOINT ["/usr/bin/syncgo"]
+CMD ["run"]

@@ -24,4 +24,4 @@ test:
 
 
 demo: build prepare
-	./bin/syncgo --config ./e2e/config.yaml
+	./bin/syncgo run --config ./e2e/config.yaml
