@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/syncgo/syncgo/pkg/config"
+	"github.com/syncgo/syncgo/pkg/logger"
 	"github.com/syncgo/syncgo/pkg/metrics"
 	"github.com/syncgo/syncgo/pkg/postgresql"
 	"github.com/syncgo/syncgo/pkg/search_engine_client"
@@ -47,7 +48,7 @@ func preparePublicationAndSlot(ctx context.Context, cfg *config.Config) error {
 	}
 	defer func() {
 		if closeErr := adminConn.Close(ctx); closeErr != nil {
-			slog.Error("failed to close admin connection", slog.String("err", closeErr.Error()))
+			logger.Error("failed to close admin connection", closeErr)
 		}
 	}()
 
@@ -86,7 +87,7 @@ func prepareIndex(ctx context.Context, cfg *config.Config, monitoring *metrics.M
 	}
 	defer func() {
 		if closeErr := client.Close(); closeErr != nil {
-			slog.Error("failed to close search engine client", slog.String("err", closeErr.Error()))
+			logger.Error("failed to close search engine client", closeErr)
 		}
 	}()
 

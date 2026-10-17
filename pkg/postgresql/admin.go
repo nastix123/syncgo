@@ -6,9 +6,14 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/syncgo/syncgo/pkg/logger"
+
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+// replicationPlugin is the logical decoding output plugin used by syncgo.
+const replicationPlugin = "pgoutput"
 
 func NewStandard(ctx context.Context, cfg Config) (*pgconn.PgConn, error) {
 	url := fmt.Sprintf("postgres://%s:%s@%s:%s/%s",
@@ -21,13 +26,13 @@ func NewStandard(ctx context.Context, cfg Config) (*pgconn.PgConn, error) {
 
 	pgCfg, err := pgconn.ParseConfig(url)
 	if err != nil {
-		slog.Error("failed to parse postgres config", slog.String("error", err.Error()))
+		logger.Error("failed to parse postgres config", err)
 		return nil, err
 	}
 
 	conn, err := pgconn.ConnectConfig(ctx, pgCfg)
 	if err != nil {
-		slog.Error("failed to connect to postgres", slog.String("error", err.Error()))
+		logger.Error("failed to connect to postgres", err)
 		return nil, err
 	}
 
@@ -64,7 +69,7 @@ func EnsurePublication(ctx context.Context, conn *pgconn.PgConn, pubName string,
 		quoteIdent(pubName), strings.Join(quoteIdents(tables), ", "))
 
 	if _, err := conn.Exec(ctx, sql).ReadAll(); err != nil {
-		slog.Error("failed to create publication", slog.String("err", err.Error()))
+		logger.Error("failed to create publication", err)
 		return err
 	}
 
@@ -78,6 +83,11 @@ func EnsurePublication(ctx context.Context, conn *pgconn.PgConn, pubName string,
 
 // EnsureReplicationSlot creates the logical replication slot if it does not
 // exist yet. It is idempotent: an existing slot is left as is.
+//
+// The slot is created with the pg_create_logical_replication_slot SQL
+// function instead of the CREATE_REPLICATION_SLOT replication command,
+// because the admin connection is a regular (non-walsender) connection.
+// The slot name and plugin are passed as query parameters.
 func EnsureReplicationSlot(ctx context.Context, conn *pgconn.PgConn, slotName string) error {
 	exists, err := ReplicationSlotExists(ctx, conn, slotName)
 	if err != nil {
@@ -88,11 +98,13 @@ func EnsureReplicationSlot(ctx context.Context, conn *pgconn.PgConn, slotName st
 		return nil
 	}
 
-	sql := fmt.Sprintf("CREATE_REPLICATION_SLOT %s LOGICAL pgoutput", quoteIdent(slotName))
+	const sql = "SELECT pg_create_logical_replication_slot($1, $2)"
+	args := [][]byte{[]byte(slotName), []byte(replicationPlugin)}
 
-	if _, err := conn.Exec(ctx, sql).ReadAll(); err != nil {
-		slog.Error("failed to create replication slot", slog.String("err", err.Error()))
-		return err
+	if result := conn.ExecParams(ctx, sql, args, []uint32{pgtype.TextOID, pgtype.TextOID}, nil, nil); !result.NextRow() {
+		_, err := result.Close()
+		logger.Error("failed to create replication slot", err)
+		return fmt.Errorf("failed to create replication slot %q: %w", slotName, err)
 	}
 
 	slog.Info("created replication slot", slog.String("name", slotName))
@@ -100,14 +112,29 @@ func EnsureReplicationSlot(ctx context.Context, conn *pgconn.PgConn, slotName st
 	return nil
 }
 
+// quoteIdent quotes a single SQL identifier (schema, table, publication or
+// slot name). Embedded double quotes are doubled per the SQL standard.
 func quoteIdent(name string) string {
-	return fmt.Sprintf("%q", name)
+	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
+}
+
+// quoteQualifiedIdent quotes a possibly schema-qualified name (e.g.
+// "public.users"), quoting each dot-separated part individually. A name
+// without a dot is treated as a bare identifier.
+func quoteQualifiedIdent(name string) string {
+	parts := strings.Split(name, ".")
+	quoted := make([]string, len(parts))
+	for i, part := range parts {
+		quoted[i] = quoteIdent(part)
+	}
+
+	return strings.Join(quoted, ".")
 }
 
 func quoteIdents(names []string) []string {
 	quoted := make([]string, len(names))
 	for i, name := range names {
-		quoted[i] = quoteIdent(name)
+		quoted[i] = quoteQualifiedIdent(name)
 	}
 
 	return quoted

@@ -3,7 +3,7 @@ include e2e/e2e.mk
 GOBIN := $(shell pwd)/bin
 MODULE  := github.com/syncgo/syncgo
 VERSION := dev
-LDFLAGS := -X main.version=$(VERSION)
+LDFLAGS := -X $(MODULE)/pkg/cli.version=$(VERSION)
 
 .PHONY: tools generate build test run demo lint
 
