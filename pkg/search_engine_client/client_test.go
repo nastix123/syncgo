@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/syncgo/opensearchpb"
-
 	"github.com/syncgo/syncgo/internal/bulk_transformer"
 	"github.com/syncgo/syncgo/pkg/http_client"
 	"github.com/syncgo/syncgo/pkg/search_engine_client/mocks"
