@@ -2,16 +2,12 @@ package replication
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/syncgo/syncgo/internal/bulk_transformer"
 )
 
-const (
-	pgoutputName = "pgoutput"
-	wal2jsonName = "wal2json"
-)
+const pgoutputName = "pgoutput"
 
 // EventKind describes the type of a decoded replication event.
 type EventKind uint8
@@ -50,7 +46,7 @@ type Plugin interface {
 // SupportedPlugins returns the names of all supported logical decoding
 // plugins.
 func SupportedPlugins() []string {
-	return []string{pgoutputName, wal2jsonName}
+	return []string{pgoutputName}
 }
 
 // NewPlugin creates the plugin implementation for the given logical decoding
@@ -60,8 +56,6 @@ func NewPlugin(name, publicationName, idColumn string) (Plugin, error) {
 	switch name {
 	case "", pgoutputName:
 		return newPgOutputPlugin(publicationName, idColumn), nil
-	case wal2jsonName:
-		return newWal2JSONPlugin(idColumn), nil
 	default:
 		return nil, fmt.Errorf("unsupported replication plugin %q (supported: %s)",
 			name, strings.Join(SupportedPlugins(), ", "))
@@ -70,10 +64,4 @@ func NewPlugin(name, publicationName, idColumn string) (Plugin, error) {
 
 func quotePluginOption(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", "''") + "'"
-}
-
-func sortedPluginNames(names []string) []string {
-	sorted := append([]string(nil), names...)
-	sort.Strings(sorted)
-	return sorted
 }

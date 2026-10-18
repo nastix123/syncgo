@@ -145,6 +145,9 @@ postgresql:
   publication_name: syncgo_publication
   id_column: id
   plugin: pgoutput
+  tables:
+    - public.users
+    - public.orders
 ```
 
 | Parameter          | Required | Description                                                              |
@@ -157,7 +160,8 @@ postgresql:
 | `slot_name`        |      Yes | Logical replication slot used by SyncGo                                  |
 | `publication_name` |      Yes | PostgreSQL publication consumed by SyncGo                                |
 | `id_column`        |       No | Primary identifier column used when processing changes; defaults to `id` |
-| `plugin`           |       No | Logical decoding output plugin; `pgoutput` (default) or `wal2json`        |
+| `plugin`           |       No | Logical decoding output plugin; `pgoutput` (default)                      |
+| `tables`           |       No | Schema-qualified tables (e.g. `public.users`) added to the publication by `prepare` |
 
 `slot_name` and `publication_name` are mandatory.
 
@@ -166,6 +170,36 @@ If `id_column` is not specified, SyncGo uses:
 ```text
 id
 ```
+
+## Tables
+
+The optional `tables` parameter lists the schema-qualified tables that the
+`prepare` command adds to the publication:
+
+```yaml
+postgresql:
+  tables:
+    - public.users
+    - public.orders
+```
+
+When `tables` is set and the publication does not exist yet, `prepare`
+creates it:
+
+```sql
+CREATE PUBLICATION syncgo_publication
+FOR TABLE public.users, public.orders;
+```
+
+An existing publication is left as is, so new tables must be added to the
+publication manually with:
+
+```sql
+ALTER PUBLICATION syncgo_publication ADD TABLE public.orders;
+```
+
+When `tables` is omitted, `prepare` skips publication management: the
+publication is managed externally (see [Logical replication](#logical-replication)).
 
 ## Logical replication
 
@@ -197,22 +231,20 @@ FOR ALL TABLES;
 
 The configured publication determines which PostgreSQL changes are delivered to SyncGo.
 
-## Output plugins
+## Output plugin
 
-SyncGo supports multiple PostgreSQL logical decoding output plugins via the
-`postgresql.plugin` option:
+The `postgresql.plugin` option selects the PostgreSQL logical decoding
+output plugin. SyncGo currently supports:
 
-| Plugin     | Description                                                                                         |
-| ---------- | ---------------------------------------------------------------------------------------------------- |
-| `pgoutput` | Built-in PostgreSQL plugin (default). Streams the native binary protocol; requires a publication.    |
-| `wal2json` | [wal2json](https://github.com/eulerto/wal2json) plugin, format-version 2. Streams JSON change events. |
+| Plugin     | Description                                                                                      |
+| ---------- | ------------------------------------------------------------------------------------------------- |
+| `pgoutput` | Built-in PostgreSQL plugin (default). Streams the native binary protocol; requires a publication. |
 
-With `pgoutput` (the default) nothing extra is needed. To use `wal2json`,
-install the extension on the PostgreSQL server and set:
+With `pgoutput` (the default) nothing extra is needed:
 
 ```yaml
 postgresql:
-  plugin: wal2json
+  plugin: pgoutput
 ```
 
 The `prepare` command creates the replication slot with the configured

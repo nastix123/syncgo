@@ -61,8 +61,8 @@ type PostgreSQLConfig struct {
 	PublicationName string `yaml:"publication_name"`
 	SlotName        string `yaml:"slot_name"`
 	IDColumn        string `yaml:"id_column"`
-	// Plugin is the logical decoding output plugin name (e.g. pgoutput,
-	// wal2json). Empty defaults to pgoutput.
+	// Plugin is the logical decoding output plugin name. Empty defaults to
+	// pgoutput.
 	Plugin string `yaml:"plugin"`
 	// Tables is the list of schema-qualified tables (e.g. public.users) added
 	// to the publication by the prepare command. Empty means the publication

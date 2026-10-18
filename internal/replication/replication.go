@@ -31,8 +31,8 @@ type LogicalRepicationConfig struct {
 	PublicationName string
 	SlotName        string
 	IDColumn        string
-	// PluginName is the logical decoding output plugin (e.g. pgoutput,
-	// wal2json). Empty defaults to pgoutput.
+	// PluginName is the logical decoding output plugin. Empty defaults to
+	// pgoutput.
 	PluginName string
 	DB         postgresql.Config
 }

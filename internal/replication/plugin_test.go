@@ -128,7 +128,6 @@ func TestNewPlugin(t *testing.T) {
 		wantErr  bool
 	}{
 		{name: "pgoutput", plugin: "pgoutput", expected: "pgoutput"},
-		{name: "wal2json", plugin: "wal2json", expected: "wal2json"},
 		{name: "empty defaults to pgoutput", plugin: "", expected: "pgoutput"},
 		{name: "unknown", plugin: "test_decoding", wantErr: true},
 	}
@@ -149,121 +148,6 @@ func TestNewPlugin(t *testing.T) {
 				t.Errorf("Name() = %q, want %q", p.Name(), tt.expected)
 			}
 		})
-	}
-}
-
-func TestWal2JSONDecode(t *testing.T) {
-	p := newWal2JSONPlugin("id")
-
-	t.Run("begin", func(t *testing.T) {
-		events, err := p.Decode([]byte(`{"action":"B"}`))
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if len(events) != 1 || events[0].Kind != EventBegin {
-			t.Fatalf("events = %+v, want [EventBegin]", events)
-		}
-	})
-
-	t.Run("commit", func(t *testing.T) {
-		events, err := p.Decode([]byte(`{"action":"C"}`))
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if len(events) != 1 || events[0].Kind != EventCommit {
-			t.Fatalf("events = %+v, want [EventCommit]", events)
-		}
-	})
-
-	t.Run("insert", func(t *testing.T) {
-		events, err := p.Decode([]byte(`{"action":"I","schema":"public","table":"users","columns":[{"name":"id","type":"integer","value":42},{"name":"name","type":"text","value":"foo"}]}`))
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if len(events) != 1 || events[0].Kind != EventChange {
-			t.Fatalf("events = %+v, want one EventChange", events)
-		}
-		change := events[0].Change
-		if change.ID != "42" || change.Action != bulk_transformer.Index {
-			t.Fatalf("change = %+v, want id=42 action=index", change)
-		}
-		if string(change.Body) != `{"id":42,"name":"foo"}` {
-			t.Fatalf("body = %s", change.Body)
-		}
-	})
-
-	t.Run("update without oldkeys", func(t *testing.T) {
-		events, err := p.Decode([]byte(`{"action":"U","schema":"public","table":"users","columns":[{"name":"id","type":"integer","value":42},{"name":"name","type":"text","value":"bar"}]}`))
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if len(events) != 1 || events[0].Kind != EventChange {
-			t.Fatalf("events = %+v, want one EventChange", events)
-		}
-		change := events[0].Change
-		if change.ID != "42" || change.Action != bulk_transformer.Update {
-			t.Fatalf("change = %+v, want id=42 action=update", change)
-		}
-	})
-
-	t.Run("update with oldkeys", func(t *testing.T) {
-		events, err := p.Decode([]byte(`{"action":"U","schema":"public","table":"users","oldkeys":{"id":42},"columns":[{"name":"id","type":"integer","value":43}]}`))
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if len(events) != 1 {
-			t.Fatalf("events = %+v, want one event", events)
-		}
-		if events[0].Change.ID != "42" {
-			t.Fatalf("id = %q, want 42 (from oldkeys)", events[0].Change.ID)
-		}
-	})
-
-	t.Run("delete", func(t *testing.T) {
-		events, err := p.Decode([]byte(`{"action":"D","schema":"public","table":"users","oldkeys":{"id":42}}`))
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if len(events) != 1 || events[0].Kind != EventChange {
-			t.Fatalf("events = %+v, want one EventChange", events)
-		}
-		change := events[0].Change
-		if change.ID != "42" || change.Action != bulk_transformer.Delete {
-			t.Fatalf("change = %+v, want id=42 action=delete", change)
-		}
-	})
-
-	t.Run("missing id column is skipped", func(t *testing.T) {
-		events, err := p.Decode([]byte(`{"action":"I","schema":"public","table":"users","columns":[{"name":"name","type":"text","value":"foo"}]}`))
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if len(events) != 0 {
-			t.Fatalf("events = %+v, want none", events)
-		}
-	})
-
-	t.Run("invalid json", func(t *testing.T) {
-		if _, err := p.Decode([]byte(`not json`)); err == nil {
-			t.Fatal("expected error for invalid JSON")
-		}
-	})
-}
-
-func TestWal2JSONOptions(t *testing.T) {
-	p := newWal2JSONPlugin("id")
-	opts := p.Options()
-	if len(opts) == 0 {
-		t.Fatal("expected non-empty options")
-	}
-	foundFormat := false
-	for _, o := range opts {
-		if o == `"format-version" '2'` {
-			foundFormat = true
-		}
-	}
-	if !foundFormat {
-		t.Error("format-version option is missing")
 	}
 }
 
