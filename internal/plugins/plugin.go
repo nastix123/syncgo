@@ -1,4 +1,7 @@
-package replication
+// Package plugins contains the PostgreSQL logical decoding output plugins
+// supported by SyncGo. Each plugin decodes the raw XLogData payloads of its
+// output plugin into a common event stream (see Plugin).
+package plugins
 
 import (
 	"fmt"
@@ -49,10 +52,10 @@ func SupportedPlugins() []string {
 	return []string{pgoutputName}
 }
 
-// NewPlugin creates the plugin implementation for the given logical decoding
+// New creates the plugin implementation for the given logical decoding
 // plugin name. publicationName and idColumn are only used by plugins that
 // need them (pgoutput uses the publication, both use the id column).
-func NewPlugin(name, publicationName, idColumn string) (Plugin, error) {
+func New(name, publicationName, idColumn string) (Plugin, error) {
 	switch name {
 	case "", pgoutputName:
 		return newPgOutputPlugin(publicationName, idColumn), nil
@@ -60,8 +63,4 @@ func NewPlugin(name, publicationName, idColumn string) (Plugin, error) {
 		return nil, fmt.Errorf("unsupported replication plugin %q (supported: %s)",
 			name, strings.Join(SupportedPlugins(), ", "))
 	}
-}
-
-func quotePluginOption(value string) string {
-	return "'" + strings.ReplaceAll(value, "'", "''") + "'"
 }

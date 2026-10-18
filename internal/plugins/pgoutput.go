@@ -1,8 +1,9 @@
-package replication
+package plugins
 
 import (
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/syncgo/syncgo/internal/bulk_transformer"
 
@@ -19,7 +20,6 @@ type pgOutputPlugin struct {
 
 	relations map[uint32]*pglogrepl.RelationMessage
 	typeMap   *pgtype.Map
-	txn       txnTracker
 }
 
 func newPgOutputPlugin(publicationName, idColumn string) *pgOutputPlugin {
@@ -159,4 +159,10 @@ func (p *pgOutputPlugin) logMissingID(rel *pglogrepl.RelationMessage, operation 
 		slog.String("column", p.idColumn),
 		slog.String("relation", rel.RelationName),
 	)
+}
+
+// quotePluginOption quotes a single-quoted START_REPLICATION option value,
+// escaping embedded single quotes.
+func quotePluginOption(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "''") + "'"
 }

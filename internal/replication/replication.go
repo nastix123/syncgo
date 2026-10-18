@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/syncgo/syncgo/internal/bulk_transformer"
+	"github.com/syncgo/syncgo/internal/plugins"
 	asynctask "github.com/syncgo/syncgo/pkg/async_task"
 	"github.com/syncgo/syncgo/pkg/postgresql"
 
@@ -45,7 +46,7 @@ type LogicalReplicationConn struct {
 	slotName        string
 	publicationName string
 
-	plugin Plugin
+	plugin plugins.Plugin
 
 	xLogPos  pglogrepl.LSN
 	txn      txnTracker
@@ -58,7 +59,7 @@ type LogicalReplicationConn struct {
 }
 
 func New(ctx context.Context, cfg LogicalRepicationConfig, conn *pgconn.PgConn, batcher RowBatcher) (*LogicalReplicationConn, error) {
-	plugin, err := NewPlugin(cfg.PluginName, cfg.PublicationName, cfg.IDColumn)
+	plugin, err := plugins.New(cfg.PluginName, cfg.PublicationName, cfg.IDColumn)
 	if err != nil {
 		slog.Error("failed to create replication plugin", slog.String("err", err.Error()))
 		return nil, err
@@ -246,4 +247,12 @@ func (c *LogicalReplicationConn) sendStandbyStatusUpdate(ctx context.Context) er
 	slog.Debug("sent standby status update", slog.Any("walWritePosition", clientXLogPos))
 
 	return nil
+}
+
+func (c *LogicalReplicationConn) enqueueRow(item bulk_transformer.Data) {
+	if c.batcher == nil {
+		return
+	}
+	c.batcher.Add(item)
+	c.txn.recordAdd()
 }

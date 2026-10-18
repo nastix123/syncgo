@@ -3,12 +3,14 @@ package replication
 import (
 	"fmt"
 	"log/slog"
+
+	"github.com/syncgo/syncgo/internal/plugins"
 )
 
 // process decodes a single XLogData payload through the plugin and applies
 // the resulting events to the batcher. Transaction boundaries from the plugin
-// (EventBegin/EventCommit/EventRollback) drive the commit/rollback semantics
-// of the txnTracker so only committed rows reach the batcher.
+// (plugins.EventBegin/EventCommit/EventRollback) drive the commit/rollback
+// semantics of the txnTracker so only committed rows reach the batcher.
 func (c *LogicalReplicationConn) process(walData []byte) error {
 	events, err := c.plugin.Decode(walData)
 	if err != nil {
@@ -18,16 +20,16 @@ func (c *LogicalReplicationConn) process(walData []byte) error {
 
 	for _, event := range events {
 		switch event.Kind {
-		case EventBegin:
+		case plugins.EventBegin:
 			c.txn.begin()
 
-		case EventCommit:
+		case plugins.EventCommit:
 			c.txn.commit(c.batcher)
 
-		case EventRollback:
+		case plugins.EventRollback:
 			c.txn.rollback(c.batcher)
 
-		case EventChange:
+		case plugins.EventChange:
 			slog.Debug("change operation",
 				slog.String("action", event.Change.Action.String()),
 				slog.String("id", event.Change.ID),

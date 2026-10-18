@@ -1,4 +1,4 @@
-package replication
+package plugins
 
 import (
 	"bytes"
@@ -134,7 +134,7 @@ func TestNewPlugin(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p, err := NewPlugin(tt.plugin, "pub", "id")
+			p, err := New(tt.plugin, "pub", "id")
 			if tt.wantErr {
 				if err == nil {
 					t.Fatalf("expected error for plugin %q", tt.plugin)
