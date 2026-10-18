@@ -156,6 +156,8 @@ postgresql:
 | `slot_name`        |      Yes | Logical replication slot used by SyncGo                                  |
 | `publication_name` |      Yes | PostgreSQL publication consumed by SyncGo                                |
 | `id_column`        |       No | Primary identifier column used when processing changes; defaults to `id` |
+| `tables`           |       No | Schema-qualified table list (e.g. `public.users`) added to the publication by `prepare`; empty means the publication is managed externally |
+| `export_snapshot`  |       No | Enable the initial snapshot load in `prepare`; see below; defaults to `false` |
 
 `slot_name` and `publication_name` are mandatory.
 
@@ -164,6 +166,41 @@ If `id_column` is not specified, SyncGo uses:
 ```text
 id
 ```
+
+## Snapshot load (initial load)
+
+By default, SyncGo only streams ongoing changes: the `prepare` command creates
+the publication, the replication slot and the search index, and rows that
+already exist in PostgreSQL are not copied to the index.
+
+Set `postgresql.export_snapshot: true` to have `prepare` perform an initial
+load:
+
+```yaml
+postgresql:
+  tables:
+    - public.users
+  export_snapshot: true
+```
+
+When enabled and the replication slot does not exist yet, `prepare` creates
+the slot through the streaming replication protocol with
+`EXPORT_SNAPSHOT`. PostgreSQL then exports a snapshot at the slot's
+consistent point, and SyncGo copies the current content of the publication
+tables into the search engine index under that snapshot. Because the
+snapshot and the change stream start at the same LSN, no rows are lost or
+duplicated when `run` continues streaming from the slot position.
+
+Notes:
+
+- The snapshot load only happens when the slot is created. If the slot
+  already exists, `prepare` skips the load and logs a warning; to re-run the
+  initial load, drop the slot and clear the index.
+- Tables are taken from `postgresql.tables`, or — when it is empty — from the
+  tables of the configured publication.
+- Every table must contain the configured `id_column`.
+- The exported snapshot is only valid while the connection that created the
+  slot is open, so `prepare` performs the load within one run.
 
 ## Logical replication
 

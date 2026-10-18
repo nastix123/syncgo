@@ -75,7 +75,12 @@ func New(ctx context.Context, cfg LogicalRepicationConfig, conn *pgconn.PgConn, 
 		slog.Error("failed to identify system", slog.String("err", err.Error()))
 		return nil, err
 	}
-	replicationConn.xLogPos = sysident.XLogPos
+	// Start the stream from the slot's confirmed position rather than the
+	// current WAL head: with START_REPLICATION LSN 0 the server resumes from
+	// the slot's confirmed_flush_lsn, so changes committed between the
+	// prepare command (slot creation / snapshot load) and this run are not
+	// skipped.
+	replicationConn.xLogPos = 0
 
 	slog.Info("successfully indentify system",
 		slog.String("sysetmID", sysident.SystemID),

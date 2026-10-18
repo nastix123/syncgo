@@ -8,6 +8,7 @@ import (
 
 	"github.com/syncgo/syncgo/pkg/logger"
 
+	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -110,6 +111,63 @@ func EnsureReplicationSlot(ctx context.Context, conn *pgconn.PgConn, slotName st
 	slog.Info("created replication slot", slog.String("name", slotName))
 
 	return nil
+}
+
+// ExportedSlot describes a replication slot created with an exported
+// snapshot via the streaming replication protocol.
+type ExportedSlot struct {
+	SlotName      string
+	ConsistentLSN pglogrepl.LSN
+	SnapshotName  string
+}
+
+// CreateReplicationSlotWithSnapshot creates a logical replication slot via
+// the streaming replication protocol with snapshot export and returns the
+// exported snapshot name along with the slot's consistent point LSN.
+//
+// The exported snapshot is valid only while conn (the connection that
+// created the slot) stays open; the caller must use it before closing the
+// connection.
+func CreateReplicationSlotWithSnapshot(ctx context.Context, conn *pgconn.PgConn, slotName string) (ExportedSlot, error) {
+	result, err := pglogrepl.CreateReplicationSlot(ctx, conn, slotName, replicationPlugin, pglogrepl.CreateReplicationSlotOptions{
+		SnapshotAction: "EXPORT_SNAPSHOT",
+	})
+	if err != nil {
+		return ExportedSlot{}, fmt.Errorf("failed to create replication slot %q with snapshot export: %w", slotName, err)
+	}
+
+	consistentLSN, err := pglogrepl.ParseLSN(result.ConsistentPoint)
+	if err != nil {
+		return ExportedSlot{}, fmt.Errorf("failed to parse consistent point %q: %w", result.ConsistentPoint, err)
+	}
+
+	return ExportedSlot{
+		SlotName:      result.SlotName,
+		ConsistentLSN: consistentLSN,
+		SnapshotName:  result.SnapshotName,
+	}, nil
+}
+
+// PublicationTables returns the schema-qualified table list of the given
+// publication.
+func PublicationTables(ctx context.Context, conn *pgconn.PgConn, pubName string) ([]string, error) {
+	const sql = "SELECT schemaname, tablename FROM pg_publication_tables WHERE pubname = $1"
+
+	result := conn.ExecParams(ctx, sql, [][]byte{[]byte(pubName)}, []uint32{pgtype.TextOID}, nil, nil).Read()
+	if result.Err != nil {
+		return nil, fmt.Errorf("failed to list tables of publication %q: %w", pubName, result.Err)
+	}
+	rows := result.Rows
+
+	tables := make([]string, 0, len(rows))
+	for _, row := range rows {
+		if len(row) != 2 {
+			continue
+		}
+		tables = append(tables, fmt.Sprintf("%s.%s", string(row[0]), string(row[1])))
+	}
+
+	return tables, nil
 }
 
 // quoteIdent quotes a single SQL identifier (schema, table, publication or

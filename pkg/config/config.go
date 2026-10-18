@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/syncgo/syncgo/pkg/gzip"
+	"github.com/syncgo/syncgo/pkg/postgresql"
 
 	"gopkg.in/yaml.v3"
 )
@@ -65,6 +66,23 @@ type PostgreSQLConfig struct {
 	// to the publication by the prepare command. Empty means the publication
 	// is managed externally.
 	Tables []string `yaml:"tables"`
+	// ExportSnapshot enables the initial (snapshot) load in the prepare
+	// command: the replication slot is created with an exported snapshot and
+	// the current content of the publication tables is copied into the
+	// search engine index. It only applies when the slot does not exist yet.
+	ExportSnapshot bool `yaml:"export_snapshot"`
+}
+
+// Config converts the PostgreSQL configuration into a connection config for
+// the postgresql package.
+func (p *PostgreSQLConfig) Config() postgresql.Config {
+	return postgresql.Config{
+		User:     p.User,
+		Password: p.Password,
+		Host:     p.Host,
+		Port:     p.Port,
+		Database: p.Database,
+	}
 }
 
 // SearchConfig holds connection configuration for Elasticsearch or OpenSearch (HTTP).
