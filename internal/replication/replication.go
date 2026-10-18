@@ -15,7 +15,6 @@ import (
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgproto3"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const (
@@ -32,7 +31,10 @@ type LogicalRepicationConfig struct {
 	PublicationName string
 	SlotName        string
 	IDColumn        string
-	DB              postgresql.Config
+	// PluginName is the logical decoding output plugin (e.g. pgoutput,
+	// wal2json). Empty defaults to pgoutput.
+	PluginName string
+	DB         postgresql.Config
 }
 
 type LogicalReplicationConn struct {
@@ -43,8 +45,7 @@ type LogicalReplicationConn struct {
 	slotName        string
 	publicationName string
 
-	plugin     string
-	pluginArgs []string
+	plugin Plugin
 
 	xLogPos  pglogrepl.LSN
 	txn      txnTracker
@@ -57,18 +58,22 @@ type LogicalReplicationConn struct {
 }
 
 func New(ctx context.Context, cfg LogicalRepicationConfig, conn *pgconn.PgConn, batcher RowBatcher) (*LogicalReplicationConn, error) {
+	plugin, err := NewPlugin(cfg.PluginName, cfg.PublicationName, cfg.IDColumn)
+	if err != nil {
+		slog.Error("failed to create replication plugin", slog.String("err", err.Error()))
+		return nil, err
+	}
+
 	replicationConn := &LogicalReplicationConn{
 		wg:                    sync.WaitGroup{},
 		conn:                  conn,
 		slotName:              cfg.SlotName,
 		publicationName:       cfg.PublicationName,
 		idColumn:              cfg.IDColumn,
+		plugin:                plugin,
 		batcher:               batcher,
 		standbyMessageTimeout: standbyMessageTimeout,
 	}
-
-	replicationConn.plugin = "pgoutput"
-	replicationConn.pluginArgs = replicationConn.buildPluginArgs()
 
 	sysident, err := pglogrepl.IdentifySystem(ctx, conn)
 	if err != nil {
@@ -94,24 +99,13 @@ func New(ctx context.Context, cfg LogicalRepicationConfig, conn *pgconn.PgConn, 
 	return replicationConn, nil
 }
 
-func (c *LogicalReplicationConn) buildPluginArgs() []string {
-	return []string{
-		"proto_version '1'",
-		fmt.Sprintf(`publication_names '%s'`, c.publicationName),
-		"messages 'false'",
-	}
-}
-
 func (c *LogicalReplicationConn) StartReplication(ctx context.Context) error {
-	if err := c.startReplication(ctx, c.slotName, c.xLogPos, c.pluginArgs); err != nil {
+	if err := c.startReplication(ctx, c.slotName, c.xLogPos, c.plugin.Options()); err != nil {
 		return err
 	}
 
-	relations := map[uint32]*pglogrepl.RelationMessage{}
-	typeMap := pgtype.NewMap()
-
 	c.wg.Go(func() {
-		if err := c.readReplicationMessages(ctx, relations, typeMap); err != nil {
+		if err := c.readReplicationMessages(ctx); err != nil {
 			if !errors.Is(err, context.Canceled) {
 				slog.Error("failed to read replication messages", slog.String("err", err.Error()))
 			}
@@ -148,7 +142,7 @@ func (c *LogicalReplicationConn) startReplication(ctx context.Context, slotName 
 // 	return nil
 // }
 
-func (c *LogicalReplicationConn) readReplicationMessages(ctx context.Context, relations map[uint32]*pglogrepl.RelationMessage, typeMap *pgtype.Map) error {
+func (c *LogicalReplicationConn) readReplicationMessages(ctx context.Context) error {
 	for ctx.Err() == nil {
 		select {
 		case <-ctx.Done():
@@ -219,7 +213,9 @@ func (c *LogicalReplicationConn) readReplicationMessages(ctx context.Context, re
 					slog.Time("serverTime", xld.ServerTime),
 				)
 
-				c.process(xld.WALData, relations, typeMap)
+				if err := c.process(xld.WALData); err != nil {
+					return err
+				}
 
 				c.mu.Lock()
 				clientXLogPos := c.xLogPos

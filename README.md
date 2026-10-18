@@ -144,6 +144,7 @@ postgresql:
   slot_name: syncgo_slot
   publication_name: syncgo_publication
   id_column: id
+  plugin: pgoutput
 ```
 
 | Parameter          | Required | Description                                                              |
@@ -156,6 +157,7 @@ postgresql:
 | `slot_name`        |      Yes | Logical replication slot used by SyncGo                                  |
 | `publication_name` |      Yes | PostgreSQL publication consumed by SyncGo                                |
 | `id_column`        |       No | Primary identifier column used when processing changes; defaults to `id` |
+| `plugin`           |       No | Logical decoding output plugin; `pgoutput` (default) or `wal2json`        |
 
 `slot_name` and `publication_name` are mandatory.
 
@@ -194,6 +196,28 @@ FOR ALL TABLES;
 ```
 
 The configured publication determines which PostgreSQL changes are delivered to SyncGo.
+
+## Output plugins
+
+SyncGo supports multiple PostgreSQL logical decoding output plugins via the
+`postgresql.plugin` option:
+
+| Plugin     | Description                                                                                         |
+| ---------- | ---------------------------------------------------------------------------------------------------- |
+| `pgoutput` | Built-in PostgreSQL plugin (default). Streams the native binary protocol; requires a publication.    |
+| `wal2json` | [wal2json](https://github.com/eulerto/wal2json) plugin, format-version 2. Streams JSON change events. |
+
+With `pgoutput` (the default) nothing extra is needed. To use `wal2json`,
+install the extension on the PostgreSQL server and set:
+
+```yaml
+postgresql:
+  plugin: wal2json
+```
+
+The `prepare` command creates the replication slot with the configured
+plugin. An existing slot keeps its original plugin, so switching plugins
+requires dropping and recreating the slot.
 
 ## PostgreSQL permissions
 
@@ -541,6 +565,7 @@ postgresql:
   slot_name: syncgo_slot
   publication_name: syncgo_publication
   id_column: id
+  plugin: pgoutput
 
 search_engine:
   name: opensearch
