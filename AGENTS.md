@@ -12,6 +12,8 @@ make generate         # install tools (go install tool) + go generate ./... (moc
 make demo             # build + make prepare (e2e docker env) + run with e2e/config.yaml
 ```
 
+- Before every commit (agent pre-commit rule): run `make lint` and `make test` and only commit when both pass. Do not commit with failing lint/tests or skip these checks "to save time".
+
 - Run a single test: `go test ./internal/batcher/ -run TestName -v`
 - Unit tests use `-short`; CI also runs them with `-race` and coverage. Set `LOG_LEVEL=error` to quiet logs.
 - E2E tests (build tag `e2e`, in `./e2e/...`) require the docker environment: `make prepare` (starts Postgres/Elasticsearch/OpenSearch via `e2e/docker-compose.yml`, configures `wal_level=logical`, creates the publication), then `go test -tags e2e -timeout 5m ./e2e/...`. `make generate_data` seeds changes into the e2e Postgres.
